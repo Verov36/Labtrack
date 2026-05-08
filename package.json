@@ -1,0 +1,46 @@
+{
+  "name": "labtrack",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "setup": "npm install && npx prisma db push && npx tsx prisma/seed.ts",
+    "backup": "tsx scripts/backup/backupEngine.ts backup",
+    "backup:verify": "tsx scripts/backup/backupEngine.ts verify",
+    "backup:test": "tsx scripts/backup/backupEngine.ts test",
+    "backup:list": "tsx scripts/backup/backupEngine.ts list",
+    "backup:prune": "tsx scripts/backup/backupEngine.ts prune",
+    "restore": "tsx scripts/backup/restore.ts"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.4.1",
+    "@prisma/client": "^5.14.0",
+    "bcryptjs": "^2.4.3",
+    "next": "^14.2.35",
+    "next-auth": "^4.24.7",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.5.4",
+    "react": "^18",
+    "react-dom": "^18",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "prisma": "^5.14.0",
+    "tailwindcss": "^3.3.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5"
+  }
+}

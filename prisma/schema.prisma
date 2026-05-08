@@ -1,0 +1,184 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── DATABASE ─────────────────────────────────────────────────────────────────
+// Local dev:   DATABASE_URL="file:./dev.db"          (SQLite, zero config)
+// Production:  DATABASE_URL="postgresql://..."        (PostgreSQL)
+// Switch by changing the provider below OR set DATABASE_PROVIDER env var.
+// For PostgreSQL, change provider to "postgresql" and run: npx prisma migrate deploy
+datasource db {
+  provider = "sqlite"   // Change to "postgresql" for production
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTH / USERS ─────────────────────────────────────────────────────────────
+model User {
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  name                String
+  password            String    // bcrypt hashed (cost 12)
+  role                String    @default("technician") // admin | technician | viewer
+  status              String    @default("active")     // active | inactive | locked
+
+  // Profile
+  avatar              String    @default("")
+  teamMemberId        Int?      @unique
+  teamMember          TeamMember? @relation(fields: [teamMemberId], references: [id])
+
+  // MFA (TOTP)
+  mfaEnabled          Boolean   @default(false)
+  mfaSecret           String?   // encrypted TOTP secret
+  mfaBackupCodes      String?   // JSON array of hashed backup codes
+
+  // Account lockout
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  // Password policy
+  passwordChangedAt   DateTime  @default(now())
+  passwordHistory     String?   // JSON array of last 10 bcrypt hashes
+
+  // Timestamps
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+
+  // NextAuth
+  accounts            Account[]
+  sessions            Session[]
+
+  // Auth audit trail
+  authEvents          AuthEvent[]
+}
+
+// NextAuth adapter models (needed even for credentials-only auth)
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── PRODUCT ──────────────────────────────────────────────────────────────────
+model Product {
+  id                 Int       @id @default(autoincrement())
+  name               String
+  barcode            String?
+  category           String
+  lot                String
+  location           String
+  quantity           Float
+  unit               String
+  expiry             String    // ISO date string YYYY-MM-DD
+  addedBy            String
+  addedOn            String
+  lowStockThreshold  Float     @default(0)
+  useWithinDays      Int?
+  openedOn           String?
+  openedBy           String?
+  deletedAt          String?   // soft delete
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  usageLogs    UsageLog[]
+  activityLogs ActivityLog[]
+}
+
+// ─── TEAM MEMBER ──────────────────────────────────────────────────────────────
+model TeamMember {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String   @unique
+  role       String   // admin | technician | viewer
+  location   String
+  status     String   @default("active")
+  avatar     String
+  joined     String
+  lastActive String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user         User?
+  usageLogs    UsageLog[]
+  activityLogs ActivityLog[]
+}
+
+// ─── USAGE LOG ────────────────────────────────────────────────────────────────
+model UsageLog {
+  id             Int         @id @default(autoincrement())
+  product        Product     @relation(fields: [productId], references: [id])
+  productId      Int
+  productName    String
+  barcode        String?
+  qty            Float
+  unit           String
+  usedBy         String
+  teamMember     TeamMember? @relation(fields: [teamMemberId], references: [id])
+  teamMemberId   Int?
+  date           String
+  note           String?
+  openedProduct  Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+}
+
+// ─── AUTH AUDIT LOG ───────────────────────────────────────────────────────────
+// Immutable record of all authentication events.
+// Stored separately from ActivityLog so it can be locked down independently.
+model AuthEvent {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  email      String   // store even if user is deleted
+  event      String   // login_success | login_failure | logout | lockout |
+                      // mfa_success | mfa_failure | password_changed |
+                      // account_locked | account_unlocked | session_expired
+  ipAddress  String?
+  userAgent  String?
+  detail     String?
+  createdAt  DateTime @default(now())
+}
+
+// ─── ACTIVITY LOG ─────────────────────────────────────────────────────────────
+model ActivityLog {
+  id           Int         @id @default(autoincrement())
+  type         String
+  target       String
+  detail       String
+  actor        String
+  teamMember   TeamMember? @relation(fields: [teamMemberId], references: [id])
+  teamMemberId Int?
+  product      Product?    @relation(fields: [productId], references: [id])
+  productId    Int?
+  createdAt    DateTime    @default(now())
+}
+
